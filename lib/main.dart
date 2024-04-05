@@ -25,7 +25,20 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final List<String> countries = ['London', 'Paris', 'New York', 'Tokyo', 'Berlin', 'Moscow', 'Rome', 'Sydney'];
+  final List<String> countries = [
+    'London',
+    'Paris',
+    'New York',
+    'Tokyo',
+    'Berlin',
+    'Moscow',
+    'Rome',
+    'Sydney',
+    'Madrid',
+    'Beijing',
+    'Cairo',
+    'Rio de Janeiro'
+  ];
   late List<String> filteredCountries;
   List<String> secrets = [];
 
@@ -38,23 +51,45 @@ class _HomePageState extends State<HomePage> {
   void _filterCountries(String query) {
     setState(() {
       if (query == 'admin') {
-        // Navigate to the secret text page
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => SecretTextPage(
-              onAddSecret: (secret) {
-                setState(() {
-                  secrets.add(secret);
-                });
-              },
-            ),
-          ),
-        );
+        _navigateToSecretListPage();
       } else {
-        // Filter countries normally
-        filteredCountries = countries.where((country) => country.toLowerCase().contains(query.toLowerCase())).toList();
+        filteredCountries = countries
+            .where((country) =>
+                country.toLowerCase().contains(query.toLowerCase()))
+            .toList();
       }
+    });
+  }
+
+  void _navigateToSecretListPage() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SecretListPage(
+          secrets: secrets,
+          onAddSecret: _addSecret,
+          onDeleteSecret: _deleteSecret,
+          onEditSecret: _editSecret,
+        ),
+      ),
+    );
+  }
+
+  void _addSecret(String title, String message) {
+    setState(() {
+      secrets.add('$title: $message');
+    });
+  }
+
+  void _deleteSecret(int index) {
+    setState(() {
+      secrets.removeAt(index);
+    });
+  }
+
+  void _editSecret(int index, String title, String message) {
+    setState(() {
+      secrets[index] = '$title: $message';
     });
   }
 
@@ -90,7 +125,8 @@ class _HomePageState extends State<HomePage> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => DetailedWeatherScreen(city: filteredCountries[index]),
+                        builder: (context) =>
+                            DetailedWeatherScreen(city: filteredCountries[index]),
                       ),
                     );
                   },
@@ -107,20 +143,6 @@ class _HomePageState extends State<HomePage> {
               },
             ),
           ),
-          SizedBox(height: 20),
-          // Secret button appears only if 'admin' is entered in the search box
-          if (secrets.isNotEmpty && filteredCountries.isEmpty)
-            ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => SecretListPage(secrets: secrets),
-                  ),
-                );
-              },
-              child: Text('View Secrets'),
-            ),
         ],
       ),
     );
@@ -185,7 +207,8 @@ class WeatherDetails extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('City: ${weatherData.city}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text('City: ${weatherData.city}',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             SizedBox(height: 10),
             Text('Temperature: ${weatherData.temperature}°C'),
             SizedBox(height: 10),
@@ -270,17 +293,128 @@ Future<WeatherData> fetchWeatherData(String city) async {
   }
 }
 
+class SecretListPage extends StatefulWidget {
+  final List<String> secrets;
+  final Function(String, String) onAddSecret;
+  final Function(int, String, String) onEditSecret;
+  final Function(int) onDeleteSecret;
+
+  SecretListPage({
+    required this.secrets,
+    required this.onAddSecret,
+    required this.onEditSecret,
+    required this.onDeleteSecret,
+  });
+
+  @override
+  _SecretListPageState createState() => _SecretListPageState();
+}
+
+class _SecretListPageState extends State<SecretListPage> {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Secrets'),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.add),
+            onPressed: () {
+              _navigateToSecretTextPage(context);
+            },
+          ),
+        ],
+      ),
+      body: GridView.builder(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+        ),
+        itemCount: widget.secrets.length,
+        itemBuilder: (context, index) {
+          return Card(
+            elevation: 5,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(widget.secrets[index]),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.delete),
+                        onPressed: () {
+                          _deleteSecret(index);
+                        },
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.edit),
+                        onPressed: () {
+                          _navigateToEditSecretTextPage(context, index);
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _navigateToSecretTextPage(BuildContext context) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SecretTextPage(),
+      ),
+    );
+    if (result != null && result is Map<String, String>) {
+      widget.onAddSecret(result['title']!, result['message']!);
+    }
+  }
+
+  void _navigateToEditSecretTextPage(BuildContext context, int index) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditSecretTextPage(
+          title: widget.secrets[index].split(':')[0],
+          message: widget.secrets[index].split(':')[1],
+        ),
+      ),
+    );
+    if (result != null && result is Map<String, String>) {
+      widget.onEditSecret(index, result['title']!, result['message']!);
+    }
+  }
+
+  void _deleteSecret(int index) {
+    setState(() {
+      widget.onDeleteSecret(index);
+    });
+  }
+}
+
 class SecretTextPage extends StatefulWidget {
-  final Function(String) onAddSecret;
-
-  SecretTextPage({required this.onAddSecret});
-
   @override
   _SecretTextPageState createState() => _SecretTextPageState();
 }
 
 class _SecretTextPageState extends State<SecretTextPage> {
-  String secretText = '';
+  late TextEditingController _titleController;
+  late TextEditingController _messageController;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController();
+    _messageController = TextEditingController();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -294,49 +428,121 @@ class _SecretTextPageState extends State<SecretTextPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             TextField(
-              onChanged: (text) {
-                setState(() {
-                  secretText = text;
-                });
-              },
+              controller: _titleController,
               decoration: InputDecoration(
-                hintText: 'Enter secret text...',
+                hintText: 'Enter secret title...',
+              ),
+            ),
+            SizedBox(height: 20),
+            TextField(
+              controller: _messageController,
+              decoration: InputDecoration(
+                hintText: 'Enter secret message...',
               ),
             ),
             SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
-                widget.onAddSecret(secretText);
-                Navigator.pop(context);
+                _saveSecret();
               },
-              child: Text('Save Secret Text'),
+              child: Text('Save Secret'),
             ),
           ],
         ),
       ),
     );
   }
+
+  void _saveSecret() {
+    final title = _titleController.text.trim();
+    final message = _messageController.text.trim();
+    if (title.isNotEmpty && message.isNotEmpty) {
+      Navigator.pop(context, {'title': title, 'message': message});
+    } else {
+      // Show error message or handle invalid input
+    }
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _messageController.dispose();
+    super.dispose();
+  }
 }
 
-class SecretListPage extends StatelessWidget {
-  final List<String> secrets;
+class EditSecretTextPage extends StatefulWidget {
+  final String title;
+  final String message;
 
-  SecretListPage({required this.secrets});
+  EditSecretTextPage({required this.title, required this.message});
+
+  @override
+  _EditSecretTextPageState createState() => _EditSecretTextPageState();
+}
+
+class _EditSecretTextPageState extends State<EditSecretTextPage> {
+  late TextEditingController _titleController;
+  late TextEditingController _messageController;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.title);
+    _messageController = TextEditingController(text: widget.message);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Secrets'),
+        title: Text('Edit Secret'),
       ),
-      body: ListView.builder(
-        itemCount: secrets.length,
-        itemBuilder: (context, index) {
-          return ListTile(
-            title: Text(secrets[index]),
-          );
-        },
+      body: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            TextField(
+              controller: _titleController,
+              decoration: InputDecoration(
+                hintText: 'Edit secret title...',
+              ),
+            ),
+            SizedBox(height: 20),
+            TextField(
+              controller: _messageController,
+              decoration: InputDecoration(
+                hintText: 'Edit secret message...',
+              ),
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                _saveEditedSecret();
+              },
+              child: Text('Save Changes'),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  void _saveEditedSecret() {
+    final newTitle = _titleController.text.trim();
+    final newMessage = _messageController.text.trim();
+    if (newTitle.isNotEmpty && newMessage.isNotEmpty) {
+      Navigator.pop(context, {'title': newTitle, 'message': newMessage});
+    } else {
+      // Show error message or handle invalid input
+    }
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _messageController.dispose();
+    super.dispose();
   }
 }
